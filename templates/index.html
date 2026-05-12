@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>UTG Messenger – Full Features</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.22.0/index.css">
+    <script type="module">
+        import { Picker } from 'https://cdn.jsdelivr.net/npm/emoji-picker-element@1.22.0/index.js';
+        window.EmojiPicker = Picker;
+    </script>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
+        .app-container { max-width: 1400px; margin: 0 auto; display: flex; gap: 20px; flex-wrap: wrap; }
+        .users-panel { width: 280px; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; flex-direction: column; max-height: 700px; }
+        .panel-header { padding: 15px; background: #f7f8fa; border-bottom: 1px solid #ddd; font-weight: bold; }
+        .user-list { list-style: none; padding: 0; margin: 0; flex: 1; overflow-y: auto; max-height: 260px; }
+        .user-list li { padding: 12px 15px; border-bottom: 1px solid #eee; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .user-list li:hover { background: #e4e6e9; }
+        .offline-user { opacity: 0.6; background: #f8f9fa; }
+        .unread-badge { background: #e44d2e; color: white; border-radius: 20px; padding: 2px 8px; font-size: 0.7em; }
+        .chat-panel { flex: 1; background: white; border-radius: 12px; display: flex; flex-direction: column; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: #f7f8fa; border-bottom: 1px solid #ddd; }
+        .current-user-info { display: flex; align-items: center; gap: 8px; }
+        .clear-btn, .disconnect-btn { background: #6c757d; padding: 5px 12px; font-size: 0.8em; border: none; border-radius: 20px; color: white; cursor: pointer; margin-left: 8px; }
+        .disconnect-btn { background: #dc3545; }
+        .messages-area { flex: 1; height: 500px; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; background: #fafafa; }
+        .message { max-width: 70%; margin: 5px 0; padding: 8px 12px; border-radius: 18px; word-wrap: break-word; }
+        .sent { background: #1b74e4; color: white; align-self: flex-end; }
+        .received { background: #e4e6e9; color: black; align-self: flex-start; }
+        .system { background: #fff3cd; color: #856404; align-self: center; font-size: 0.8em; }
+        .timestamp { font-size: 0.65em; opacity: 0.7; margin-left: 8px; }
+        .typing-indicator { font-size: 0.8em; color: #888; font-style: italic; margin: 5px 0; padding-left: 15px; }
+        .input-area { display: flex; gap: 8px; padding: 15px; border-top: 1px solid #ddd; background: white; position: relative; align-items: center; }
+        .input-area input { flex: 1; padding: 10px 15px; border: 1px solid #ccc; border-radius: 25px; }
+        button { background: #1b74e4; color: white; border: none; border-radius: 25px; padding: 10px 16px; cursor: pointer; }
+        button:hover { background: #145dbf; }
+        .sync-btn { background: #28a745; margin: 15px; width: calc(100% - 30px); }
+        .emoji-btn, .attach-btn { background: #ffc107; color: #333; }
+        .offline-status { text-align: center; font-size: 0.8em; margin-bottom: 10px; color: #666; }
+        .avatar { width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px; text-transform: uppercase; margin-right: 10px; }
+        .small-avatar { width: 28px; height: 28px; font-size: 12px; }
+        #emoji-picker-container { position: absolute; bottom: 70px; left: 10px; z-index: 1000; display: none; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+
+        /* Registration Form */
+        .register-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+            z-index: 2000;
+        }
+        .register-card {
+            background: white; padding: 30px; border-radius: 16px; width: 350px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2); text-align: center;
+        }
+        .register-card input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 8px; }
+        .register-card button { width: 100%; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div id="register-overlay" class="register-overlay">
+    <div class="register-card">
+        <h2>📡 UTG Messenger</h2>
+        <input type="text" id="reg-username" placeholder="Username" autocomplete="off">
+        <input type="text" id="reg-ip" placeholder="Registry IP (default 127.0.0.1)" value="127.0.0.1">
+        <button onclick="submitRegistration()">Connect</button>
+        <div id="reg-error" style="color: red; margin-top: 10px;"></div>
+    </div>
+</div>
+
+<div class="app-container" style="display: none;" id="app-container">
+    <div class="users-panel">
+        <div class="panel-header">📡 Users</div>
+        <div style="padding: 5px 15px; background:#f0f2f5; font-size:0.8em;">✅ Online</div>
+        <ul id="online-users" class="user-list"><li>Loading...</li></ul>
+        <div style="padding: 5px 15px; background:#f0f2f5; font-size:0.8em;">⏳ Offline</div>
+        <ul id="offline-users" class="user-list"><li>None</li></ul>
+        <button class="sync-btn" onclick="syncMessages()">📥 Sync Offline Messages</button>
+        <div id="offline-status" class="offline-status"></div>
+    </div>
+    <div class="chat-panel">
+        <div class="top-bar">
+            <div id="current-chat-user" class="current-user-info">✨ Select a user</div>
+            <div>
+                <button class="clear-btn" onclick="clearCurrentChat()">Clear chat</button>
+                <button class="disconnect-btn" onclick="disconnect()">Disconnect</button>
+            </div>
+        </div>
+        <div id="messages-area" class="messages-area">
+            <div class="message system">👈 Click a user on the left to start chatting</div>
+        </div>
+        <div id="typing-area" class="typing-indicator" style="display:none;"></div>
+        <div class="input-area">
+            <input type="text" id="message-text" placeholder="Type a message..." disabled>
+            <button id="attach-btn" class="attach-btn" disabled>📎</button>
+            <input type="file" id="file-input" style="display: none;">
+            <button id="emoji-btn" class="emoji-btn" disabled>😀</button>
+            <button id="send-btn" disabled onclick="sendMessage()">Send</button>
+            <div id="emoji-picker-container"></div>
+        </div>
+    </div>
+</div>
+
+<audio id="notif-sound" preload="auto" style="display:none;">
+    <source src="https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+    let connected = false;
+    let currentChatWith = null;
+    let conversations = {};
+    let unreadCounts = {};
+    let typingTimeout = null;
+    let emojiPicker = null;
+    let currentUsername = null;
+
+    // Avatar helper
+    function getAvatarInfo(username) {
+        const colors = ['#1b74e4', '#e44d2e', '#28a745', '#dc3545', '#fd7e14', '#6f42c1', '#20c997', '#ffc107'];
+        let hash = 0;
+        for (let i = 0; i < username.length; i++) hash += username.charCodeAt(i);
+        const color = colors[hash % colors.length];
+        const initials = username.substring(0, 2).toUpperCase();
+        return { color, initials };
+    }
+
+    function showTyping(user) {
+        const typingDiv = document.getElementById('typing-area');
+        typingDiv.innerText = `${user} is typing...`;
+        typingDiv.style.display = 'block';
+        if (typingTimeout) clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => typingDiv.style.display = 'none', 2000);
+    }
+
+    function playSound() {
+        document.getElementById('notif-sound').play().catch(e => console.log);
+    }
+
+    function renderCurrentChat() {
+        const messagesDiv = document.getElementById('messages-area');
+        if (!currentChatWith || !conversations[currentChatWith]) {
+            messagesDiv.innerHTML = '<div class="message system">No messages yet. Start typing!</div>';
+            return;
+        }
+        const msgs = conversations[currentChatWith];
+        messagesDiv.innerHTML = '';
+        msgs.forEach(msg => {
+            const div = document.createElement('div');
+            div.className = `message ${msg.isSent ? 'sent' : 'received'}`;
+            // If message contains a file link, render as clickable <a>
+            if (msg.isFileLink) {
+                div.innerHTML = `<a href="${msg.text}" target="_blank">📎 Download attached file</a> <span class="timestamp">${msg.timestamp || ''}</span>`;
+            } else {
+                div.innerHTML = `${msg.text} <span class="timestamp">${msg.timestamp || ''}</span>`;
+            }
+            messagesDiv.appendChild(div);
+        });
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    async function submitRegistration() {
+        const username = document.getElementById('reg-username').value.trim();
+        const registry_ip = document.getElementById('reg-ip').value.trim() || '127.0.0.1';
+        const errorDiv = document.getElementById('reg-error');
+        if (!username) {
+            errorDiv.innerText = 'Username required';
+            return;
+        }
+        errorDiv.innerText = 'Connecting...';
+        try {
+            const response = await fetch('/api/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, registry_ip, registry_port: 5555 })
+            });
+            const data = await response.json();
+            if (response.ok && data.status === 'connected') {
+                currentUsername = username;
+                document.getElementById('register-overlay').style.display = 'none';
+                document.getElementById('app-container').style.display = 'flex';
+                connected = true;
+                startPolling();
+                loadUsers();
+                fetchMessages();
+                enableChat(true);
+                initEmojiPicker();
+                initFileAttachment();
+            } else {
+                errorDiv.innerText = 'Registration failed: ' + (data.error || 'Unknown');
+            }
+        } catch (err) {
+            errorDiv.innerText = 'Error: ' + err.message;
+        }
+    }
+
+    function enableChat(enable) {
+        document.getElementById('message-text').disabled = !enable;
+        document.getElementById('send-btn').disabled = !enable;
+        document.getElementById('emoji-btn').disabled = !enable;
+        document.getElementById('attach-btn').disabled = !enable;
+    }
+
+    function startPolling() {
+        setInterval(() => {
+            if (connected) { loadUsers(); fetchMessages(); }
+        }, 2000);
+    }
+
+    async function loadUsers() {
+        const response = await fetch('/api/users');
+        const data = await response.json();
+        const onlineList = document.getElementById('online-users');
+        const offlineList = document.getElementById('offline-users');
+        if (data.online && data.online.length > 0) {
+            onlineList.innerHTML = data.online.map(u => {
+                const avatar = getAvatarInfo(u);
+                const badge = unreadCounts[u] ? `<span class="unread-badge">${unreadCounts[u]}</span>` : '';
+                return `<li onclick="selectUser('${u}')">
+                            <div style="display:flex; align-items:center;">
+                                <div class="avatar small-avatar" style="background-color:${avatar.color}">${avatar.initials}</div>
+                                <span>${u}</span>
+                            </div>
+                            ${badge}
+                        </li>`;
+            }).join('');
+        } else {
+            onlineList.innerHTML = '<li>No online users</li>';
+        }
+        if (data.offline_known && data.offline_known.length > 0) {
+            offlineList.innerHTML = data.offline_known.map(u => {
+                const avatar = getAvatarInfo(u);
+                return `<li onclick="selectUser('${u}')" class="offline-user">
+                            <div style="display:flex; align-items:center;">
+                                <div class="avatar small-avatar" style="background-color:${avatar.color}">${avatar.initials}</div>
+                                <span>${u}</span>
+                            </div>
+                        </li>`;
+            }).join('');
+        } else {
+            offlineList.innerHTML = '<li>None</li>';
+        }
+    }
+
+    async function fetchMessages() {
+        const response = await fetch('/api/messages');
+        const data = await response.json();
+        if (data.messages && data.messages.length > 0) {
+            for (let msg of data.messages) {
+                const sender = msg.from;
+                if (!conversations[sender]) conversations[sender] = [];
+                let isFileLink = false;
+                let displayText = msg.text;
+                if (msg.text && (msg.text.startsWith('/api/download/') || msg.text.includes('/api/download/'))) {
+                    isFileLink = true;
+                }
+                conversations[sender].push({
+                    from: sender,
+                    text: displayText,
+                    timestamp: msg.timestamp,
+                    isSent: false,
+                    isFileLink: isFileLink
+                });
+                if (currentChatWith !== sender) {
+                    playSound();
+                    unreadCounts[sender] = (unreadCounts[sender] || 0) + 1;
+                } else {
+                    showTyping(sender);
+                }
+                if (currentChatWith === sender) renderCurrentChat();
+            }
+            loadUsers();
+        }
+    }
+
+    async function sendMessage(textOverride) {
+        let text = textOverride !== undefined ? textOverride : document.getElementById('message-text').value.trim();
+        if (!text || !currentChatWith) return;
+        const response = await fetch('/api/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: currentChatWith, message: text })
+        });
+        const data = await response.json();
+        if (data.success) {
+            if (!conversations[currentChatWith]) conversations[currentChatWith] = [];
+            conversations[currentChatWith].push({
+                from: 'me',
+                text: text,
+                timestamp: new Date().toLocaleTimeString(),
+                isSent: true,
+                isFileLink: text.startsWith('/api/download/')
+            });
+            renderCurrentChat();
+            document.getElementById('message-text').value = '';
+        } else {
+            alert('Failed to send');
+        }
+    }
+
+    async function syncMessages() {
+        const response = await fetch('/api/sync', { method: 'POST' });
+        const data = await response.json();
+        if (data.status === 'synced') {
+            if (data.messages && data.messages.length > 0) {
+                for (let msg of data.messages) {
+                    const sender = msg.from;
+                    if (!conversations[sender]) conversations[sender] = [];
+                    conversations[sender].push({
+                        from: sender,
+                        text: msg.text,
+                        timestamp: msg.timestamp,
+                        isSent: false,
+                        isFileLink: msg.text.startsWith('/api/download/')
+                    });
+                    if (currentChatWith === sender) renderCurrentChat();
+                }
+                fetchMessages();
+            }
+            document.getElementById('offline-status').innerText = '✅ Sync completed.';
+            setTimeout(() => document.getElementById('offline-status').innerText = '', 3000);
+        } else {
+            alert('Sync failed');
+        }
+    }
+
+    async function disconnect() {
+        if (confirm('Disconnect and exit?')) {
+            await fetch('/api/disconnect', { method: 'POST' });
+            connected = false;
+            location.reload();
+        }
+    }
+
+    function selectUser(username) {
+        currentChatWith = username;
+        const avatar = getAvatarInfo(username);
+        document.getElementById('current-chat-user').innerHTML = `
+            <div style="display:flex; align-items:center; gap:8px;">
+                <div class="avatar" style="background-color:${avatar.color}">${avatar.initials}</div>
+                <span>${username}</span>
+            </div>
+        `;
+        document.getElementById('message-text').disabled = false;
+        document.getElementById('send-btn').disabled = false;
+        document.getElementById('emoji-btn').disabled = false;
+        document.getElementById('attach-btn').disabled = false;
+        if (unreadCounts[username]) delete unreadCounts[username];
+        loadUsers();
+        renderCurrentChat();
+    }
+
+    function clearCurrentChat() {
+        if (currentChatWith && confirm(`Clear chat with ${currentChatWith}?`)) {
+            delete conversations[currentChatWith];
+            renderCurrentChat();
+        }
+    }
+
+    function initEmojiPicker() {
+        const container = document.getElementById('emoji-picker-container');
+        const emojiBtn = document.getElementById('emoji-btn');
+        emojiBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (container.style.display === 'none') {
+                container.style.display = 'block';
+                if (!emojiPicker) {
+                    emojiPicker = new window.EmojiPicker();
+                    container.appendChild(emojiPicker);
+                    emojiPicker.addEventListener('emoji-click', event => {
+                        document.getElementById('message-text').value += event.detail.unicode;
+                        container.style.display = 'none';
+                    });
+                }
+            } else {
+                container.style.display = 'none';
+            }
+        });
+        document.addEventListener('click', (e) => {
+            if (container && !container.contains(e.target) && e.target !== emojiBtn) {
+                container.style.display = 'none';
+            }
+        });
+    }
+
+    function initFileAttachment() {
+        const attachBtn = document.getElementById('attach-btn');
+        const fileInput = document.getElementById('file-input');
+        attachBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const formData = new FormData();
+            formData.append('file', file);
+            const uploadResponse = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const uploadData = await uploadResponse.json();
+            if (uploadData.fileUrl) {
+                // Send the file URL as a message
+                await sendMessage(uploadData.fileUrl);
+            } else {
+                alert('File upload failed');
+            }
+            fileInput.value = '';
+        });
+    }
+
+    // If user clicks outside the registration overlay, do nothing - they must register.
+</script>
+</body>
+</html>
